@@ -2,7 +2,7 @@
 
 ## PROBLEM STATEMENT AND METHODOLOGY:
 
-This project attempts to answer the following question: Can changes in jail incarceration rates be predicted at the county-level through modeling of structural conditions such as employment rates, education, and population and demographics dynamics? Using a subset of incarceration rates data between 2008 and 2017 as compiled by the Vera Institute of Justice from several Bureau of Justice Statistics (BJS) data collections, I appended additional county-level data to model using non-parametric, binary classification algorithms. This data included county-level data on population, demographics, migration, education, income, employment, and veterans. The target variable was constructed by comparing the 2017 jail incarceration rate with the average rate from 2008-2016, with the target labels being Increase or Decrease/Same for the 2017 rate. I followed the OSEMiN framework for this project, sourcing the data from the Vera Institute of Justice and the USDA's Economic Research Service for the other county-level data. After cleaning and exploring the data, I implemented several classification models using GridSearchCV for fine tuning of the hyperparameters for each algorithm. The models used include a baseline Decision Tree Classifier, Random Forest Classifier, Extra Trees Classifier, and AdaBoost Classifier. Modelling was conducted on two sets of data - one with incarceration-related features and one without.
+This project attempts to answer the following question: **Can changes in jail incarceration rates be predicted at the county-level through modeling of structural conditions such as employment rates, education, and population and demographics dynamics?** Using a subset of incarceration rates data between 2008 and 2017 as compiled by the Vera Institute of Justice from several Bureau of Justice Statistics (BJS) data collections, I appended additional county-level data to model using non-parametric, binary classification algorithms. This data included county-level data on population, demographics, migration, education, income, employment, and veterans. The target variable was constructed by comparing the 2017 jail incarceration rate with the average rate from 2008-2016, with the target labels being Increase or Decrease/Same for the 2017 rate. I followed the OSEMiN framework for this project, sourcing the data from the Vera Institute of Justice and the USDA's Economic Research Service for the other county-level data. After cleaning and exploring the data, I implemented several classification models using GridSearchCV for fine tuning of the hyperparameters for each algorithm. The models used include a baseline Decision Tree Classifier, Random Forest Classifier, Extra Trees Classifier, and AdaBoost Classifier. Modelling was conducted on two sets of data - one with incarceration-related features and one without.
 
 ## FINDINGS AND RECOMMENDATIONS:
 
@@ -70,6 +70,7 @@ The Baseline model achieved an F1 score of 55.45%, with a training F1 score of 6
 **Obtain:**
 * Obtain csv of data of interest from Vera and ERS.
 * Load in the incarceration trends data and individual county-level datasets on socio-economic features (people, jobs, income, and veterans). 
+
 **Scrub:**
 * Incarceration data: Subset for years of interest (2008-2017)
     * Removed Prison Data, keeping only jail data
@@ -82,23 +83,26 @@ The Baseline model achieved an F1 score of 55.45%, with a training F1 score of 6
 * Drop redundant variables
 * Merge all dataframes on FIPS
 * Final Null value check
+
 **Explore:**
 * Create target variable using rule: compare 2017 rate with average rate over previous 9 years of data
 * Set aside test set
 * Create version of cleaned data without incarceration-related features (for modeling)
 * Explore and visualize data from copy of full training data.
 * Convert categorical data to dummy variables (in training and test data).
+
 **Model:**
 * Detail modelling approach, performance metrics, and feature importance.
 * Per each version of the data (with and without incarceration-related features):
     * Build Baseline Decision Tree Classifier, Random Forest Classifier, Extra Trees Classifier, and AdaBoost Classifier.
     * Produce evaluation/model performance metrics for each.
+
 **Interpret:**
 * Reproduce performance metrics for all models and interpret results.
 * Extract key findings and considerations for future analysis.
 
 ## Analysis
-All code is available within the jupyter notebook. Below is the code for the top performing models across the two data versions:
+All code is available within the jupyter notebook. Below is a preview of some code and data visualizations for exploring the class labels and select features, followed by code for the top performing models across the two data versions:
 
 ### EDA 
 
@@ -136,7 +140,7 @@ plt.show();
 ```
 ![](https://i.imgur.com/Vhl4Afc.png)
 
-The FacetGrids below help us see differences in the distributions and relationships between numerical variables split in a way that correspond to our target variable labels. For instance, in the first plot, we can see that the scatter plot between poverty and total jail population certainly appear to have a linear relationship, but remain with a much lower distribution when it comes to counties with increased incarceration rates. Also of note, our per capita income distribution has slightly greater variance and a longer right tail in counties with same or decreased incarceration rates, which suggests that in counties with higher income levels we're more likely to see steady or decreased rates. Finally, scatter plots of net international migration rates between 2010 and 2018 against median household income appear to only have a slightly upward trend, with plenty of variance. Urbanicity hues across both target var labels indicate that rural and small/mid sized counties tend to have lower median household incomes compared to urban and suburban counties.
+The FacetGrids below help us see differences in the distributions and relationships between numerical variables split in a way that correspond to our target variable labels. For instance, scatter plots of net international migration rates between 2010 and 2018 against median household income appear to only have a slightly upward trend, with plenty of variance. Urbanicity hues across both target var labels indicate that rural and small/mid sized counties tend to have lower median household incomes compared to urban and suburban counties.
 ```python
 # scatter plot of median household income and net international migration rate, with urbanicity hue
 g = sns.FacetGrid(feats_target, col="incarc_rate_change_2017", hue="urbanicity", height=5, aspect=1)
@@ -157,6 +161,10 @@ in all urbanicity levels, employment rate percentage changes are slightly lower 
 # boxplot of percentage change in employment from 2007-2018 by urbanicity and 2017 incarc rate change
 sns.boxplot(x='urbanicity', y='PctEmpChange0718', hue="incarc_rate_change_2017", data=feats_target)
 plt.title("Boxplot of Percentage Employment Change from 2007 to 2018 by Urbanicity", fontsize=18);
+
+# jointplot of 2017 jail admissions and total number of unemployed persons
+g = sns.jointplot(x="NumUnemployed2017", y="total_jail_adm_2017", 
+                  data=num_feats_targ, kind='reg');
 ```
 ![](https://i.imgur.com/UNIaP1x.png)
 ![](https://i.imgur.com/rj0XNLc.png)
@@ -248,6 +256,8 @@ plt.title("Confusion Matrix for AdaBoost Classifier", fontsize=20);
 ```
 ![Imgur Image](https://i.imgur.com/gDd3Eco.png)
 
+**Interpretation**: The baseline model F1 score was 78%. The AdaBoost classifier was able to achieve a higher F1 score of 87%, a 9% improvement compared to baseline. As expected the top features included previous years’ incarceration rates along with population change rates.
+
 ### Data *without* incarceration-related features - Random Forest Model 
 ```python
 rf2_clf = RandomForestClassifier(random_state=42)
@@ -328,16 +338,18 @@ weighted avg       0.66      0.66      0.63       621
 ```
 ![Imgur Image](https://i.imgur.com/Yq5Wdbx.png)
 
-## Roadmap
-* Classification models on top n features to see if model performance improves and if limited features could be used for continuous monitoring and predicting.
-* Feature engineering to improve model performance and possibly reduce the number of total features.
+**Interpretation**: When it came to modelling the data withOUT any incarceration-related features, the AdaBoost was still the best performing in terms of having the highest F1 score (75.9%), but the Random Forest model performed better in terms of the F1 scores per class label. AdaBoost was not as accurate in classifying counties with decreased/steady rates, erroneously predicting 190 counties to have increased rates when in fact they had decreased/steady rates.
+
+The Random Forest Classifier also misclassified counties with decreased/steady rates, but not as many as AdaBoost (160), while accurately classifying 82 counties with decreased/steady rates.
+
+## Roadmap: Considerations for Additional Analysis
 * Incorporate additional county-level data, including election data and political party distributions.
+* Feature engineering to improve model performance and possibly reduce the number of total features.
+* Classification models on top n features to see if limited features could be used for continuous monitoring and predicting.
 * Regression analysis to predict the actual rates per county.
 
-
 ## Authors
-* Serena Quiroga - *Capstone Project for the Flatiron School's Immersive Data Science Program*
-
+* Serena Quiroga - *Capstone Project for the Flatiron School's Immersive Data Science Program* - June 2020
 
 ## Acknowledgements
 * Thank you to the Vera Institute of Justice for the multi-stage efforts and enormous success in putting togehter the first-in-kind national database of county and jurisdiction level incarceration trends data. 
