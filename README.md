@@ -47,6 +47,7 @@ from IPython.display import Image
 - If we include incarceration-related features, we can see an improvement in the overall F1 scores of 87%, which is a little over a 10% increase from our best performing model on the data *without* the incarceration-related features. 
     - However, including incarceration-related features unsurprisingly means that these same features will have the most predictive power, thereby mitigating the overall understanding of how other population and socio-economic conditions interact with jail incarceration rate changes.
 - Looking at the model on data *without* incarceration-related features, we can see that county-level data on disability, population change rates and natural change rates, household income, the proportion of elderly in the population, and percentage change in employment are among the top 10 important features in our best performing model.
+  - Our best performing model is a Random Forest Classifier, achieving a 76% F1 score.
 
 ### Models on Data *with* incarceration-related features
 Our Baseline model performance achieved an F1 score of 78%.
@@ -62,7 +63,7 @@ The Baseline model achieved an F1 score of 55.45%, with a training F1 score of 6
 - Our AdaBoost model achieved an F1 score of 75.9%, only slightly better than the Extra Trees and Random Forest F1 scores (both achieved 75.8%). 
 - However, the AdaBoost model performed poorly when it came to predicting counties with decreased/steady rates, with a recall score of just 23% and an F1 score of 34% for this class label (0, Same or Decrease). By comparison, the Decision Tree Classifier and Random Forest both had higher recall scores on this class label (59% and 33% respectively), although precision scores for the Decision Tree were quite poor.
 - The Random Forest Classifier had almost as high in terms of the overall F1 score, and it had a higher F1 score on predicting class label 0 (Same or Decrease) at 44%.  
-- *Given this, Random Forest is our preferred model, showing an overall improvement to the F1 scroe of almost 31% from the baseline Decision Tree Classifier.*
+- *Given this, Random Forest is our preferred model, showing an overall improvement to the F1 scroe of almost 21% from the baseline Decision Tree Classifier.*
 - The top features in the RF model are Percentage of Non-Veterans who are on Disability, population change rates, natural change rates (2000-2010, and 2010-2018), median household income, percentage of the population aged 65 or older in 2010, and percentage employment change 2017-2018.
 
 ## OSEMiN Approach & Summary of Steps
@@ -99,7 +100,70 @@ The Baseline model achieved an F1 score of 55.45%, with a training F1 score of 6
 ## Analysis
 All code is available within the jupyter notebook. Below is the code for the top performing models across the two data versions:
 
-### Data with incarceration-related features
+### EDA 
+
+Building the target variable classes:
+
+```python
+# create a new column of average incarc rate from 2008-2016
+data['incarc_rate_avg_2008_2016'] = data[["total_jail_pop_rate_2008", "total_jail_pop_rate_2009", "total_jail_pop_rate_2010", 
+              "total_jail_pop_rate_2011", "total_jail_pop_rate_2012", "total_jail_pop_rate_2013", 
+              "total_jail_pop_rate_2014", "total_jail_pop_rate_2015", "total_jail_pop_rate_2016"]].mean(axis=1)
+
+# Create function that operates on rows to create class label based on the two columns of interest
+def change_label(row):
+    if row['total_jail_pop_rate_2017'] > row['incarc_rate_avg_2008_2016']:
+        val = "Increase"
+    else:
+        val = "Same or Decrease"
+    return val
+
+# Apply the function to our dataframe
+data['incarc_rate_change_2017'] = data.apply(change_label, axis=1)
+data['incarc_rate_change_2017'].value_counts(normalize=True)
+
+Increase            0.610055
+Same or Decrease    0.389945
+Name: incarc_rate_change_2017, dtype: float64
+```
+A large share of the Increased rates are in rural counties, far outnumbering the number of rural counties with decreased/steady incarceration rates by almost two-fold. By comparison, it appears that for the small/mid size counties and suburban counties, the number of counties with increased rates is only slightly bigger than the alternative. In urban counties, which are the fewest compared to the other urbanicity categories, we see more urban counties with the same or decreased rates than those with increased rates.
+
+```python
+# countplot of target var labels by urbanicity category
+sns.countplot('urbanicity', data=categ_feats_targ, hue="incarc_rate_change_2017")
+plt.title("Incarceration Rate Change in 2017 by Urbanicity", fontsize=20)
+plt.show();
+```
+![](https://i.imgur.com/Vhl4Afc.png)
+
+The FacetGrids below help us see differences in the distributions and relationships between numerical variables split in a way that correspond to our target variable labels. For instance, in the first plot, we can see that the scatter plot between poverty and total jail population certainly appear to have a linear relationship, but remain with a much lower distribution when it comes to counties with increased incarceration rates. Also of note, our per capita income distribution has slightly greater variance and a longer right tail in counties with same or decreased incarceration rates, which suggests that in counties with higher income levels we're more likely to see steady or decreased rates. Finally, scatter plots of net international migration rates between 2010 and 2018 against median household income appear to only have a slightly upward trend, with plenty of variance. Urbanicity hues across both target var labels indicate that rural and small/mid sized counties tend to have lower median household incomes compared to urban and suburban counties.
+```python
+# scatter plot of median household income and net international migration rate, with urbanicity hue
+g = sns.FacetGrid(feats_target, col="incarc_rate_change_2017", hue="urbanicity", height=5, aspect=1)
+g = g.map(plt.scatter, "MedHHInc", "Net_International_Migration_Rate_2010_2018", edgecolor="w").add_legend()
+```
+![](https://i.imgur.com/0deVRNz.png)
+
+In all regions, counties with decreased/steady incarceration rates have higher immigration rates from 2000-2010 compared to counties with increased incarceration rates.
+```python
+# bar plots of immigration rate (2000-2010) by region and incarceration rate change
+sns.barplot( x="region", y="Immigration_Rate_2000_2010", hue="incarc_rate_change_2017", data=feats_target)
+plt.title("Immigration Rate from 2000-2010 by Region and by Incarceration Rate Change", fontsize=18);
+```
+![](https://i.imgur.com/ETqulJ6.png)
+
+in all urbanicity levels, employment rate percentage changes are slightly lower for counties with increased incarceration rates, indicating a slower and or negative employment rate changes for counties with higher/increased incarceration rates. In other words, slower and reduced employment rate changes tend to occur in counties with increased incarceration rates. In fact, for rural and small/mid counties, those with increased incarceration rates especially show negative percentage employment change rates. Additionally, urban and suburban counties have relatively higher percentage employment changes from 2007 to 2018. This supports the observation in the below jointplot of their being an upward trend between unemployment and jail admissions.
+```python
+# boxplot of percentage change in employment from 2007-2018 by urbanicity and 2017 incarc rate change
+sns.boxplot(x='urbanicity', y='PctEmpChange0718', hue="incarc_rate_change_2017", data=feats_target)
+plt.title("Boxplot of Percentage Employment Change from 2007 to 2018 by Urbanicity", fontsize=18);
+```
+![](https://i.imgur.com/UNIaP1x.png)
+![](https://i.imgur.com/rj0XNLc.png)
+
+## Models
+
+### Data with incarceration-related features - AdaBoost Model
 ```python
 # Construct the pipeline
 ab_pipe = Pipeline([('ab', AdaBoostClassifier(random_state=42))])
@@ -182,9 +246,9 @@ sns.heatmap(cmtx, annot=True);
 
 plt.title("Confusion Matrix for AdaBoost Classifier", fontsize=20);
 ```
+![Imgur Image](https://i.imgur.com/gDd3Eco.png)
 
-
-### Data *without* incarceration-related features
+### Data *without* incarceration-related features - Random Forest Model 
 ```python
 rf2_clf = RandomForestClassifier(random_state=42)
 
@@ -262,8 +326,7 @@ Random Forest Classifier: F1 score on Test set: 0.7580645161290321
    macro avg       0.65      0.61      0.60       621
 weighted avg       0.66      0.66      0.63       621
 ```
-
-
+![Imgur Image](https://i.imgur.com/Yq5Wdbx.png)
 
 ## Roadmap
 * Classification models on top n features to see if model performance improves and if limited features could be used for continuous monitoring and predicting.
